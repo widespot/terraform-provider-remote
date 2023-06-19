@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     hashicups = {
-      source = "hashicorp.com/edu/hashicups-pf"
+      source = "registry.terraform.io/widespot/remote"
     }
   }
 }
