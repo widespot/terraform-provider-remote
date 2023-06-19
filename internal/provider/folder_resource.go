@@ -71,7 +71,8 @@ func (r *folderResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed: true,
+				Computed:    true,
+				Description: "Placeholder identifier attribute.",
 			},
 			"last_updated": schema.StringAttribute{
 				Computed: true,
@@ -81,6 +82,7 @@ func (r *folderResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
+				Description: "Absolute path to the folder",
 			},
 			"owner": schema.Int64Attribute{
 				Required: false,
