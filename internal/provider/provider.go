@@ -2,15 +2,16 @@ package provider
 
 import (
 	"context"
-	"golang.org/x/crypto/ssh"
-	"os"
-
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"golang.org/x/crypto/ssh"
+	"os"
+	"os/user"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -43,9 +44,13 @@ func (p *hashicupsProvider) Metadata(_ context.Context, _ provider.MetadataReque
 
 // hashicupsProviderModel maps provider schema data to a Go type.
 type hashicupsProviderModel struct {
-	Host     types.String `tfsdk:"host"`
-	Username types.String `tfsdk:"username"`
-	Password types.String `tfsdk:"password"`
+	Host             types.String `tfsdk:"host"`
+	Username         types.String `tfsdk:"username"`
+	Password         types.String `tfsdk:"password"`
+	PasswordEnvVar   types.String `tfsdk:"password_env_var"`
+	PrivateKey       types.String `tfsdk:"private_key"`
+	PrivateKeyPath   types.String `tfsdk:"private_key_path"`
+	PrivateKeyEnvVar types.String `tfsdk:"private_key_env_var"`
 }
 
 // Schema defines the provider-level schema for configuration data.
@@ -53,17 +58,35 @@ func (p *hashicupsProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
-				Description: "Remote host to connect. example: `localhost:8022`. May also be provided via HASHICUPS_HOST environment variable.",
-				Optional:    true,
+				Description: "Remote host to connect. example: `localhost:8022`.",
+				Required:    true,
 			},
 			"username": schema.StringAttribute{
-				Description: "SSH user. May also be provided via HASHICUPS_USERNAME environment variable.",
+				Description: "SSH user. Default is current user",
 				Optional:    true,
 			},
 			"password": schema.StringAttribute{
-				Description: "SSH password. May also be provided via HASHICUPS_PASSWORD environment variable.",
+				Description: "SSH password.",
 				Optional:    true,
 				Sensitive:   true,
+			},
+			"password_env_var": schema.StringAttribute{
+				Description: "Env var for password.",
+				Optional:    true,
+				Sensitive:   true,
+			},
+			"private_key": schema.StringAttribute{
+				Description: "SSH private key",
+				Optional:    true,
+				Sensitive:   true,
+			},
+			"private_key_path": schema.StringAttribute{
+				Description: "Path to SSH private key",
+				Optional:    true,
+			},
+			"private_key_env_var": schema.StringAttribute{
+				Description: "Env var with private key",
+				Optional:    true,
 			},
 		},
 	}
@@ -79,117 +102,70 @@ func (p *hashicupsProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	// If practitioner provided a configuration value for any of the
-	// attributes, it must be a known value.
-
-	if config.Host.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
-			"Unknown HashiCups API Host",
-			"The provider cannot create the HashiCups API client as there is an unknown configuration value for the HashiCups API host. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the HASHICUPS_HOST environment variable.",
-		)
-	}
-
-	if config.Username.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("username"),
-			"Unknown HashiCups API Username",
-			"The provider cannot create the HashiCups API client as there is an unknown configuration value for the HashiCups API username. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the HASHICUPS_USERNAME environment variable.",
-		)
-	}
-
-	if config.Password.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("password"),
-			"Unknown HashiCups API Password",
-			"The provider cannot create the HashiCups API client as there is an unknown configuration value for the HashiCups API password. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the HASHICUPS_PASSWORD environment variable.",
-		)
-	}
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Default values to environment variables, but override
-	// with Terraform configuration value if set.
-
-	host := os.Getenv("HASHICUPS_HOST")
-	username := os.Getenv("HASHICUPS_USERNAME")
-	password := os.Getenv("HASHICUPS_PASSWORD")
-
-	if !config.Host.IsNull() {
-		host = config.Host.ValueString()
-	}
-
+	var username string
 	if !config.Username.IsNull() {
 		username = config.Username.ValueString()
+	} else {
+		// Default value is current user
+		currentUser, _ := user.Current()
+		username = currentUser.Username
 	}
-
-	if !config.Password.IsNull() {
-		password = config.Password.ValueString()
-	}
-
-	// If any of the expected configurations are missing, return
-	// errors with provider-specific guidance.
-
-	if host == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
-			"Missing HashiCups API Host",
-			"The provider cannot create the HashiCups API client as there is a missing or empty value for the HashiCups API host. "+
-				"Set the host value in the configuration or use the HASHICUPS_HOST environment variable. "+
-				"If either is already set, ensure the value is not empty.",
-		)
-	}
-
-	if username == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("username"),
-			"Missing HashiCups API Username",
-			"The provider cannot create the HashiCups API client as there is a missing or empty value for the HashiCups API username. "+
-				"Set the username value in the configuration or use the HASHICUPS_USERNAME environment variable. "+
-				"If either is already set, ensure the value is not empty.",
-		)
-	}
-
-	if password == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("password"),
-			"Missing HashiCups API Password",
-			"The provider cannot create the HashiCups API client as there is a missing or empty value for the HashiCups API password. "+
-				"Set the password value in the configuration or use the HASHICUPS_PASSWORD environment variable. "+
-				"If either is already set, ensure the value is not empty.",
-		)
-	}
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Create a new HashiCups client using the configuration values
-	/*
-		client, err := hashicups.NewClient(&host, &username, &password)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Unable to Create HashiCups API Client",
-				"An unexpected error occurred when creating the HashiCups API client. "+
-					"If the error is not clear, please contact the provider developers.\n\n"+
-					"HashiCups Client Error: "+err.Error(),
-			)
-			return
-		}
-	*/
 
 	// Create a new remote client
 	clientConfig := ssh.ClientConfig{
 		User:            username,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
-	clientConfig.Auth = append(clientConfig.Auth, ssh.Password(password))
-	client, err := NewRemoteClient(host, &clientConfig)
+
+	if !config.Password.IsNull() {
+		clientConfig.Auth = append(clientConfig.Auth, ssh.Password(config.Password.ValueString()))
+	} else if !config.PasswordEnvVar.IsNull() {
+		password := os.Getenv(config.PasswordEnvVar.ValueString())
+		if password == "" {
+			resp.Diagnostics.AddAttributeWarning(
+				path.Root("password_env_var"),
+				"Empty password ENV var",
+				"",
+			)
+		}
+		clientConfig.Auth = append(clientConfig.Auth, ssh.Password(password))
+	}
+
+	if !config.PrivateKey.IsNull() {
+		signer, err := ssh.ParsePrivateKey([]byte(config.PrivateKey.ValueString()))
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("private_key"),
+				"Private key parsing error",
+				fmt.Sprintf("couldn't create a ssh client config from private key: %s", err.Error()),
+			)
+		}
+		clientConfig.Auth = append(clientConfig.Auth, ssh.PublicKeys(signer))
+	} else if !config.PrivateKeyPath.IsNull() {
+		content, err := os.ReadFile(config.PrivateKeyPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("private_key_path"),
+				"Private key path reading error",
+				fmt.Sprintf("couldn't read private key: %s", err.Error()),
+			)
+		}
+		signer, err := ssh.ParsePrivateKey(content)
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("private_key_path"),
+				"Private key parsing error",
+				fmt.Sprintf("couldn't create a ssh client config from private key: %s", err.Error()),
+			)
+		}
+		clientConfig.Auth = append(clientConfig.Auth, ssh.PublicKeys(signer))
+	}
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	client, err := NewRemoteClient(config.Host.ValueString(), &clientConfig)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Remote API Client",

@@ -7,9 +7,9 @@ terraform {
 }
 
 provider "hashicups" {
-  username = "root"
-  password = "password"
-  host     = "localhost:8022"
+  username          = "root"
+  host              = "localhost:8022"
+  private_key_path  = "../../tests/id_rsa"
 }
 
 resource "hashicups_folder" "edu" {
@@ -18,5 +18,3 @@ resource "hashicups_folder" "edu" {
   owner_name = "root"
   group_name = "root"
 }
-
-data "hashicups_coffees" "example" {}

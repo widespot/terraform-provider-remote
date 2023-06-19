@@ -1,6 +1,6 @@
 version: '3.7'
 services:
-  api:
+  remote1:
     build: "."
     ports:
       - "8022:22"
