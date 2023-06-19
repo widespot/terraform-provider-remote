@@ -14,7 +14,9 @@ provider "hashicups" {
 
 resource "hashicups_folder" "edu" {
   count = 1
-  path = "/tmp/tests3"
+  path = "/tmp/tests6"
+  owner_name = "root"
+  group_name = "root"
 }
 
 data "hashicups_coffees" "example" {}

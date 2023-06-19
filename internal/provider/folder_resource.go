@@ -119,17 +119,17 @@ func parseInt(intStr string) int64 {
 // Create creates the resource and sets the initial Terraform state.
 func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var plan folderResourceModel
+	var plan, state folderResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Create new folder
 	path := plan.Path.String()
-	plan.ID = plan.Path
-	err := r.client.CreateDir(path, false)
+	state.ID = plan.Path
+
+	err := r.client.CreateDir(path, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating folder",
@@ -138,8 +138,35 @@ func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	if !plan.Owner.IsUnknown() {
+		err = r.client.ChownFile(path, plan.Owner.String(), true)
+	} else if !plan.OwnerName.IsUnknown() {
+		err = r.client.ChownFile(path, plan.OwnerName.String(), true)
+	}
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating folder user ownership",
+			"Could not update, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	if !plan.Group.IsUnknown() {
+		err = r.client.ChgrpFile(path, plan.Group.String(), true)
+	} else if !plan.GroupName.IsUnknown() {
+		err = r.client.ChgrpFile(path, plan.GroupName.String(), true)
+	}
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating folder group ownership",
+			"Could not update, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
 	// Map response body to schema and populate Computed attribute values
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.Path = plan.Path
+	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	group, _ := r.client.ReadFileGroup(path, true)
 	owner, _ := r.client.ReadFileOwner(path, true)
@@ -147,14 +174,14 @@ func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest,
 	ownerName, _ := r.client.ReadFileOwnerName(path, true)
 	permissions, _ := r.client.ReadFilePermissions(path, true)
 
-	plan.Owner = types.Int64Value(parseInt(owner))
-	plan.Group = types.Int64Value(parseInt(group))
-	plan.OwnerName = types.StringValue(ownerName)
-	plan.GroupName = types.StringValue(groupName)
-	plan.Permissions = types.StringValue(permissions)
+	state.Owner = types.Int64Value(parseInt(owner))
+	state.Group = types.Int64Value(parseInt(group))
+	state.OwnerName = types.StringValue(ownerName)
+	state.GroupName = types.StringValue(groupName)
+	state.Permissions = types.StringValue(permissions)
 
 	// Set state to fully populated data
-	diags = resp.State.Set(ctx, plan)
+	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -192,11 +219,13 @@ func (r *folderResource) Read(ctx context.Context, req resource.ReadRequest, res
 	owner, _ := r.client.ReadFileOwner(path, true)
 	groupName, _ := r.client.ReadFileGroupName(path, true)
 	ownerName, _ := r.client.ReadFileOwnerName(path, true)
+	permissions, _ := r.client.ReadFilePermissions(path, true)
 
 	state.Owner = types.Int64Value(parseInt(owner))
 	state.Group = types.Int64Value(parseInt(group))
 	state.OwnerName = types.StringValue(ownerName)
 	state.GroupName = types.StringValue(groupName)
+	state.Permissions = types.StringValue(permissions)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -248,19 +277,21 @@ func (r *folderResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	group, _ := r.client.ReadFileGroup(path, true)
 	owner, _ := r.client.ReadFileOwner(path, true)
 	groupName, _ := r.client.ReadFileGroupName(path, true)
 	ownerName, _ := r.client.ReadFileOwnerName(path, true)
+	permissions, _ := r.client.ReadFilePermissions(path, true)
 
-	plan.Owner = types.Int64Value(parseInt(owner))
-	plan.Group = types.Int64Value(parseInt(group))
-	plan.OwnerName = types.StringValue(ownerName)
-	plan.GroupName = types.StringValue(groupName)
+	state.Owner = types.Int64Value(parseInt(owner))
+	state.Group = types.Int64Value(parseInt(group))
+	state.OwnerName = types.StringValue(ownerName)
+	state.GroupName = types.StringValue(groupName)
+	state.Permissions = types.StringValue(permissions)
 
-	diags := resp.State.Set(ctx, plan)
+	diags := resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
