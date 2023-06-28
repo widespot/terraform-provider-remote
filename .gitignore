@@ -36,3 +36,4 @@ website/vendor
 
 # Build
 /build
+.GPG_PASSPHRASE
