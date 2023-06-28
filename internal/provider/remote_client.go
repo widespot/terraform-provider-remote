@@ -38,7 +38,7 @@ type RemoteClient struct {
 	sshClient *ssh.Client
 }
 
-func (c *RemoteClient) WriteFile(content string, path string, permissions string, sudo bool) error {
+func (c *RemoteClient) WriteFile(content string, path string, sudo bool) error {
 	return c.WriteFileShell(content, path)
 }
 
@@ -162,7 +162,7 @@ func (c *RemoteClient) FileExists(path string, sudo bool) (bool, error) {
 	return true, nil
 }
 
-func (c *RemoteClient) ReadFile(path string, sudo bool) (string, error) {
+func (c *RemoteClient) ReadFile(path string, sudo bool) (string, bool, error) {
 	return c.ReadFileShell(path)
 }
 
@@ -184,22 +184,23 @@ func (c *RemoteClient) dirExists(path string) (bool, error) {
 	return true, nil
 }
 
-func (c *RemoteClient) ReadFileShell(path string) (string, error) {
+func (c *RemoteClient) ReadFileShell(path string) (string, bool, error) {
 	sshClient := c.GetSSHClient()
 
 	session, err := sshClient.NewSession()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	defer session.Close()
 
 	cmd := fmt.Sprintf("sudo cat %s", path)
 	content, err := session.Output(cmd)
+	// TODO capture file not found
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
-	return string(content), nil
+	return string(content), true, nil
 }
 
 func (c *RemoteClient) ReadFilePermissions(path string, sudo bool) (string, error) {

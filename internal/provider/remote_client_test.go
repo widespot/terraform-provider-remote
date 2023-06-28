@@ -28,7 +28,7 @@ func TestWriteFile(t *testing.T) {
 
 	client, _ := NewRemoteClient("localhost:8022", &clientConfig)
 
-	err := client.WriteFile("blabetiblou", "/tmp/test", "permissions", true)
+	err := client.WriteFile("blabetiblou", "/tmp/test", true)
 
 	if err != nil {
 		t.Errorf("unable to create remote file: %s", err)

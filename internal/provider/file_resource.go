@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -15,24 +14,25 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource              = &folderResource{}
-	_ resource.ResourceWithConfigure = &folderResource{}
+	_ resource.Resource              = &fileResource{}
+	_ resource.ResourceWithConfigure = &fileResource{}
 )
 
-// NewFolderResource is a helper function to simplify the provider implementation.
-func NewFolderResource() resource.Resource {
-	return &folderResource{}
+// NewFileResource is a helper function to simplify the provider implementation.
+func NewFileResource() resource.Resource {
+	return &fileResource{}
 }
 
-// folderResource is the resource implementation.
-type folderResource struct {
+// fileResource is the resource implementation.
+type fileResource struct {
 	client *RemoteClient
 }
 
-// folderResourceModel maps the resource schema data.
-type folderResourceModel struct {
+// fileResourceModel maps the resource schema data.
+type fileResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Path        types.String `tfsdk:"path"`
+	Content     types.String `tfsdk:"content"`
 	Owner       types.Int64  `tfsdk:"owner"`
 	OwnerName   types.String `tfsdk:"owner_name"`
 	Group       types.Int64  `tfsdk:"group"`
@@ -42,7 +42,7 @@ type folderResourceModel struct {
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *folderResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *fileResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -62,12 +62,12 @@ func (r *folderResource) Configure(_ context.Context, req resource.ConfigureRequ
 }
 
 // Metadata returns the resource type name.
-func (r *folderResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_folder"
+func (r *fileResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_file"
 }
 
 // Schema defines the schema for the resource.
-func (r *folderResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *fileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -82,7 +82,11 @@ func (r *folderResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
-				Description: "Absolute path to the folder",
+				Description: "Absolute path to the file",
+			},
+			"content": schema.StringAttribute{
+				Required:    true,
+				Description: "Content of the file",
 			},
 			"owner": schema.Int64Attribute{
 				Required: false,
@@ -113,15 +117,10 @@ func (r *folderResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	}
 }
 
-func parseInt(intStr string) int64 {
-	v, _ := strconv.ParseInt(intStr, 10, 32)
-	return v
-}
-
 // Create creates the resource and sets the initial Terraform state.
-func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *fileResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var plan, state folderResourceModel
+	var plan, state fileResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -129,13 +128,15 @@ func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	path := plan.Path.String()
+	content := plan.Content.ValueString()
+
 	state.ID = plan.Path
 
-	err := r.client.CreateDir(path, true)
+	err := r.client.WriteFile(content, path, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating folder",
-			"Could not create folder, unexpected error: "+err.Error(),
+			"Error creating file",
+			"Could not create file, unexpected error: "+err.Error(),
 		)
 		return
 	}
@@ -170,6 +171,14 @@ func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest,
 	state.Path = plan.Path
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
+	content, _, err = r.client.ReadFile(path, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Something went wrong", err.Error())
+		return
+	}
+	//resp.Diagnostics.AddError("Something went wrong", "content is "+content)
+	//return
+
 	group, _ := r.client.ReadFileGroup(path, true)
 	owner, _ := r.client.ReadFileOwner(path, true)
 	groupName, _ := r.client.ReadFileGroupName(path, true)
@@ -181,6 +190,7 @@ func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest,
 	state.OwnerName = types.StringValue(ownerName)
 	state.GroupName = types.StringValue(groupName)
 	state.Permissions = types.StringValue(permissions)
+	state.Content = types.StringValue(content)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, state)
@@ -191,9 +201,9 @@ func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest,
 }
 
 // Read resource information.
-func (r *folderResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *fileResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
-	var state folderResourceModel
+	var state fileResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -203,16 +213,16 @@ func (r *folderResource) Read(ctx context.Context, req resource.ReadRequest, res
 	path := state.ID.ValueString()
 
 	// Get refreshed folder value from HashiCups
-	dirExists, err := r.client.dirExists(path)
+	content, fileExists, err := r.client.ReadFile(path, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading remote folder",
+			"Error Reading remote file",
 			"Could not read remote folder ID "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
-	if !dirExists {
+	if !fileExists {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -223,6 +233,7 @@ func (r *folderResource) Read(ctx context.Context, req resource.ReadRequest, res
 	ownerName, _ := r.client.ReadFileOwnerName(path, true)
 	permissions, _ := r.client.ReadFilePermissions(path, true)
 
+	state.Content = types.StringValue(content)
 	state.Owner = types.Int64Value(parseInt(owner))
 	state.Group = types.Int64Value(parseInt(group))
 	state.OwnerName = types.StringValue(ownerName)
@@ -238,9 +249,9 @@ func (r *folderResource) Read(ctx context.Context, req resource.ReadRequest, res
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *folderResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *fileResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Retrieve values from plan
-	var plan, state folderResourceModel
+	var plan, state fileResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -301,22 +312,25 @@ func (r *folderResource) Update(ctx context.Context, req resource.UpdateRequest,
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *folderResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *fileResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
-	var state folderResourceModel
+	var state fileResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	path := state.ID.ValueString()
+
 	// Delete existing order
-	err := r.client.DeleteFolder(state.ID.ValueString())
+	err := r.client.DeleteFile(path, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting HashiCups Order",
 			"Could not delete order, unexpected error: "+err.Error(),
 		)
 		return
+
 	}
 }
