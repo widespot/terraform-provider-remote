@@ -43,3 +43,26 @@ ssh root@localhost -p 8022 -i playground/id_rsa
 # Play with playground/main.tf
 terraform -chdir=playground apply
 ```
+
+## Publish
+```shell
+gpg --list-keys
+
+USER="WIDE SPOT"
+EMAIL="info@widespot.be"
+PASSPHASE=$(cat .GPG_PASSPHRASE)
+gpg --batch --generate-key <<EOF
+Key-Type: 1
+Key-Length: 2048
+Name-Real: $USER
+Name-Email: $EMAIL
+Expire-Date: 0
+Passphrase: $PASSPHASE
+EOF
+
+KEY_ID="$USER <$EMAIL>"
+gpg --armor --export $KEY_ID
+gpg --armor --export-secret-keys $KEY_ID
+
+#gpg --delete-secret-key $KEY_ID
+```
