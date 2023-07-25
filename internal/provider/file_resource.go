@@ -217,7 +217,7 @@ func (r *fileResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading remote file",
-			"Could not read remote folder ID "+state.ID.ValueString()+": "+err.Error(),
+			"Could not read remote file ID "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
