@@ -34,7 +34,9 @@ resource "remote_file" "file" {
 # Build last version (99.0.0) in playground directory
 make install
 # Deploy 
-make playground
+make playground -B
+# remove previous known hosts records
+ssh-keygen -R "[localhost]:8022"
 # Try connectivity to remote, using password
 ssh root@localhost -p 8022
 > root@127.0.0.1\'s password: password
@@ -45,6 +47,8 @@ terraform -chdir=playground apply
 ```
 
 ## Publish
+Inspired from [official tutorial](https://developer.hashicorp.com/terraform/tutorials/providers/provider-release-publish)
+on June 2023
 ```shell
 gpg --list-keys
 
