@@ -264,6 +264,17 @@ func (r *fileResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	var err error
 
+	if !plan.Content.IsUnknown() && plan.Content != state.Content {
+		err = r.client.WriteFile(plan.Content.ValueString(), path, true)
+	}
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating file content",
+			"Could not update, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
 	if !plan.Owner.IsUnknown() && plan.Owner != state.Owner {
 		err = r.client.ChownFile(path, plan.Owner.String(), true)
 	} else if !plan.OwnerName.IsUnknown() && !plan.OwnerName.Equal(state.OwnerName) {
@@ -292,12 +303,14 @@ func (r *fileResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
+	content, _, _ := r.client.ReadFile(path, true)
 	group, _ := r.client.ReadFileGroup(path, true)
 	owner, _ := r.client.ReadFileOwner(path, true)
 	groupName, _ := r.client.ReadFileGroupName(path, true)
 	ownerName, _ := r.client.ReadFileOwnerName(path, true)
 	permissions, _ := r.client.ReadFilePermissions(path, true)
 
+	state.Content = types.StringValue(content)
 	state.Owner = types.Int64Value(parseInt(owner))
 	state.Group = types.Int64Value(parseInt(group))
 	state.OwnerName = types.StringValue(ownerName)
