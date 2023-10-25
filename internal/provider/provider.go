@@ -51,6 +51,7 @@ type hashicupsProviderModel struct {
 	PrivateKey       types.String `tfsdk:"private_key"`
 	PrivateKeyPath   types.String `tfsdk:"private_key_path"`
 	PrivateKeyEnvVar types.String `tfsdk:"private_key_env_var"`
+	Sudo             types.Bool   `tfsdk:"sudo"`
 }
 
 // Schema defines the provider-level schema for configuration data.
@@ -86,6 +87,10 @@ func (p *hashicupsProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 			},
 			"private_key_env_var": schema.StringAttribute{
 				Description: "Env var with private key",
+				Optional:    true,
+			},
+			"sudo": schema.BoolAttribute{
+				Description: "Whether commands should be executed as sudo or not. Default: false",
 				Optional:    true,
 			},
 		},
@@ -165,7 +170,7 @@ func (p *hashicupsProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client, err := NewRemoteClient(config.Host.ValueString(), &clientConfig)
+	client, err := NewRemoteClient(config.Host.ValueString(), &clientConfig, config.Sudo.ValueBool())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Remote API Client",
