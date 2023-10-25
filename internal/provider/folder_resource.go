@@ -311,7 +311,7 @@ func (r *folderResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	}
 
 	// Delete existing order
-	err := r.client.DeleteFolder(state.ID.ValueString())
+	err := r.client.DeleteFolder(state.ID.ValueString(), true)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting HashiCups Order",

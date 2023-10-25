@@ -37,13 +37,14 @@ func run(s *ssh.Session, cmd string) error {
 
 type RemoteClient struct {
 	sshClient *ssh.Client
+	sudo      bool
 }
 
 func (c *RemoteClient) WriteFile(content string, path string, sudo bool) error {
-	return c.WriteFileShell(content, path)
+	return c.WriteFileShell(content, path, sudo)
 }
 
-func (c *RemoteClient) WriteFileShell(content string, path string) error {
+func (c *RemoteClient) WriteFileShell(content string, path string, sudo bool) error {
 	sshClient := c.GetSSHClient()
 
 	session, err := sshClient.NewSession()
@@ -62,7 +63,11 @@ func (c *RemoteClient) WriteFileShell(content string, path string) error {
 		stdin.Close()
 	}()
 
-	cmd := fmt.Sprintf("cat /dev/stdin | sudo tee %s", path)
+	cmd := fmt.Sprintf("tee %s", path)
+	if c.sudo {
+		cmd = fmt.Sprintf("sudo %s", cmd)
+	}
+	cmd = fmt.Sprintf("cat /dev/stdin | %s", cmd)
 	return run(session, cmd)
 }
 
@@ -76,7 +81,7 @@ func (c *RemoteClient) ChmodFile(path string, permissions string, sudo bool) err
 	defer session.Close()
 
 	cmd := fmt.Sprintf("chmod %s %s", permissions, path)
-	if sudo {
+	if c.sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
 	return run(session, cmd)
@@ -92,7 +97,7 @@ func (c *RemoteClient) CreateDir(path string, sudo bool) error {
 	defer session.Close()
 
 	cmd := fmt.Sprintf("mkdir -p %s", path)
-	if sudo {
+	if c.sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
 	return run(session, cmd)
@@ -108,7 +113,7 @@ func (c *RemoteClient) ChgrpFile(path string, group string, sudo bool) error {
 	defer session.Close()
 
 	cmd := fmt.Sprintf("chgrp %s %s", group, path)
-	if sudo {
+	if c.sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
 
@@ -125,7 +130,7 @@ func (c *RemoteClient) ChownFile(path string, owner string, sudo bool) error {
 	defer session.Close()
 
 	cmd := fmt.Sprintf("chown %s %s", owner, path)
-	if sudo {
+	if c.sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
 	return run(session, cmd)
@@ -141,7 +146,7 @@ func (c *RemoteClient) FileExists(path string, sudo bool) (bool, error) {
 	defer session.Close()
 
 	cmd := fmt.Sprintf("test -f %s", path)
-	if sudo {
+	if c.sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
 	err = run(session, cmd)
@@ -154,7 +159,7 @@ func (c *RemoteClient) FileExists(path string, sudo bool) (bool, error) {
 		defer session2.Close()
 
 		cmd := fmt.Sprintf("test ! -f %s", path)
-		if sudo {
+		if c.sudo {
 			cmd = fmt.Sprintf("sudo %s", cmd)
 		}
 		return false, session2.Run(cmd)
@@ -164,7 +169,7 @@ func (c *RemoteClient) FileExists(path string, sudo bool) (bool, error) {
 }
 
 func (c *RemoteClient) ReadFile(path string, sudo bool) (string, bool, error) {
-	return c.ReadFileShell(path)
+	return c.ReadFileShell(path, sudo)
 }
 
 func (c *RemoteClient) dirExists(path string) (bool, error) {
@@ -185,7 +190,7 @@ func (c *RemoteClient) dirExists(path string) (bool, error) {
 	return true, nil
 }
 
-func (c *RemoteClient) ReadFileShell(path string) (string, bool, error) {
+func (c *RemoteClient) ReadFileShell(path string, sudo bool) (string, bool, error) {
 	sshClient := c.GetSSHClient()
 
 	session, err := sshClient.NewSession()
@@ -194,7 +199,10 @@ func (c *RemoteClient) ReadFileShell(path string) (string, bool, error) {
 	}
 	defer session.Close()
 
-	cmd := fmt.Sprintf("sudo cat %s", path)
+	cmd := fmt.Sprintf("cat %s", path)
+	if c.sudo {
+		cmd = fmt.Sprintf("sudo %s", cmd)
+	}
 	content, err := session.CombinedOutput(cmd)
 	if err != nil {
 		// TODO find a more reliable way to catch file not found
@@ -217,7 +225,7 @@ func (c *RemoteClient) ReadFilePermissions(path string, sudo bool) (string, erro
 	defer session.Close()
 
 	cmd := fmt.Sprintf("stat -c %%a %s", path)
-	if sudo {
+	if c.sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
 	output, err := session.Output(cmd)
@@ -258,7 +266,7 @@ func (c *RemoteClient) StatFile(path string, char string, sudo bool) (string, er
 	defer session.Close()
 
 	cmd := fmt.Sprintf("stat -c %%%s %s", char, path)
-	if sudo {
+	if c.sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
 	output, err := session.Output(cmd)
@@ -270,7 +278,7 @@ func (c *RemoteClient) StatFile(path string, char string, sudo bool) (string, er
 	return group, nil
 }
 
-func (c *RemoteClient) DeleteFolder(path string) error {
+func (c *RemoteClient) DeleteFolder(path string, sudo bool) error {
 	sshClient := c.GetSSHClient()
 
 	session, err := sshClient.NewSession()
@@ -279,15 +287,18 @@ func (c *RemoteClient) DeleteFolder(path string) error {
 	}
 	defer session.Close()
 
-	cmd := fmt.Sprintf("sudo rm -rf %s", path)
+	cmd := fmt.Sprintf("rm -rf %s", path)
+	if c.sudo {
+		cmd = fmt.Sprintf("sudo %s", cmd)
+	}
 	return run(session, cmd)
 }
 
 func (c *RemoteClient) DeleteFile(path string, sudo bool) error {
-	return c.DeleteFileShell(path)
+	return c.DeleteFileShell(path, sudo)
 }
 
-func (c *RemoteClient) DeleteFileShell(path string) error {
+func (c *RemoteClient) DeleteFileShell(path string, sudo bool) error {
 	sshClient := c.GetSSHClient()
 
 	session, err := sshClient.NewSession()
@@ -296,11 +307,14 @@ func (c *RemoteClient) DeleteFileShell(path string) error {
 	}
 	defer session.Close()
 
-	cmd := fmt.Sprintf("sudo rm %s", path)
+	cmd := fmt.Sprintf("rm %s", path)
+	if c.sudo {
+		cmd = fmt.Sprintf("sudo %s", cmd)
+	}
 	return run(session, cmd)
 }
 
-func NewRemoteClient(host string, clientConfig *ssh.ClientConfig) (*RemoteClient, error) {
+func NewRemoteClient(host string, clientConfig *ssh.ClientConfig, sudo bool) (*RemoteClient, error) {
 	client, err := ssh.Dial("tcp", host, clientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't establish a connection to the remote server: %s", err.Error())
@@ -308,6 +322,7 @@ func NewRemoteClient(host string, clientConfig *ssh.ClientConfig) (*RemoteClient
 
 	return &RemoteClient{
 		sshClient: client,
+		sudo:      sudo,
 	}, nil
 }
 
