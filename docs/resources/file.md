@@ -22,6 +22,7 @@ description: |-
 
 ### Optional
 
+- `ensure_dir` (Boolean) Ensure dir before file creation. Default is false. If true, the deletion won't remove the directory and a later change of the value won't have any effect.
 - `group` (Number)
 - `group_name` (String)
 - `owner` (Number)

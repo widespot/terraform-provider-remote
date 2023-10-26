@@ -32,6 +32,7 @@ type fileResource struct {
 type fileResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Path        types.String `tfsdk:"path"`
+	EnsureDir   types.Bool   `tfsdk:"ensure_dir"`
 	Content     types.String `tfsdk:"content"`
 	Owner       types.Int64  `tfsdk:"owner"`
 	OwnerName   types.String `tfsdk:"owner_name"`
@@ -84,6 +85,11 @@ func (r *fileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 				Description: "Absolute path to the file",
 			},
+			"ensure_dir": schema.BoolAttribute{
+				Required:    false,
+				Optional:    true,
+				Description: "Ensure dir before file creation. Default is false. If true, the deletion won't remove the directory and a later change of the value won't have any effect.",
+			},
 			"content": schema.StringAttribute{
 				Required:    true,
 				Description: "Content of the file",
@@ -132,7 +138,7 @@ func (r *fileResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	state.ID = plan.Path
 
-	err := r.client.WriteFile(content, path, true)
+	err := r.client.WriteFile(content, path, true, plan.EnsureDir.ValueBool())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating file",
@@ -265,7 +271,8 @@ func (r *fileResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	var err error
 
 	if !plan.Content.IsUnknown() && plan.Content != state.Content {
-		err = r.client.WriteFile(plan.Content.ValueString(), path, true)
+		// path didn't change, no reason to ensureDir
+		err = r.client.WriteFile(plan.Content.ValueString(), path, true, false)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
