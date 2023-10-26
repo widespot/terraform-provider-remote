@@ -40,11 +40,11 @@ type RemoteClient struct {
 	sudo      bool
 }
 
-func (c *RemoteClient) WriteFile(content string, path string, sudo bool) error {
-	return c.WriteFileShell(content, path, sudo)
+func (c *RemoteClient) WriteFile(content string, path string, sudo bool, ensureDir bool) error {
+	return c.WriteFileShell(content, path, sudo, ensureDir)
 }
 
-func (c *RemoteClient) WriteFileShell(content string, path string, sudo bool) error {
+func (c *RemoteClient) WriteFileShell(content string, path string, sudo bool, ensureDir bool) error {
 	sshClient := c.GetSSHClient()
 
 	session, err := sshClient.NewSession()
@@ -68,6 +68,12 @@ func (c *RemoteClient) WriteFileShell(content string, path string, sudo bool) er
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
 	cmd = fmt.Sprintf("cat /dev/stdin | %s", cmd)
+	if ensureDir {
+		dirPathElements := strings.Split(path, "/")
+		dirPathElements = dirPathElements[:len(dirPathElements)-1]
+		dirPath := strings.Join(dirPathElements, "/")
+		cmd = fmt.Sprintf("mkdir -p %s && %s", dirPath, cmd)
+	}
 	return run(session, cmd)
 }
 
