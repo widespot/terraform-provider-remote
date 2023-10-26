@@ -87,6 +87,7 @@ func (r *fileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"ensure_dir": schema.BoolAttribute{
 				Required:    false,
+				Optional:    true,
 				Description: "Ensure dir before file creation. Default is false. If true, the deletion won't remove the directory and a later change of the value won't have any effect.",
 			},
 			"content": schema.StringAttribute{

@@ -34,4 +34,5 @@ provider "remote" {
 - `private_key` (String, Sensitive) SSH private key
 - `private_key_env_var` (String) Env var with private key
 - `private_key_path` (String) Path to SSH private key
+- `sudo` (Boolean) Whether commands should be executed as sudo or not. Default: false
 - `username` (String) SSH user. Default is current user
