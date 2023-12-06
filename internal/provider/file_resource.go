@@ -133,7 +133,7 @@ func (r *fileResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	path := plan.Path.String()
+	path := plan.Path.ValueString()
 	content := plan.Content.ValueString()
 
 	state.ID = plan.Path
@@ -150,7 +150,7 @@ func (r *fileResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if !plan.Owner.IsUnknown() {
 		err = r.client.ChownFile(path, plan.Owner.String(), true)
 	} else if !plan.OwnerName.IsUnknown() {
-		err = r.client.ChownFile(path, plan.OwnerName.String(), true)
+		err = r.client.ChownFile(path, plan.OwnerName.ValueString(), true)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -163,7 +163,7 @@ func (r *fileResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if !plan.Group.IsUnknown() {
 		err = r.client.ChgrpFile(path, plan.Group.String(), true)
 	} else if !plan.GroupName.IsUnknown() {
-		err = r.client.ChgrpFile(path, plan.GroupName.String(), true)
+		err = r.client.ChgrpFile(path, plan.GroupName.ValueString(), true)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -197,6 +197,7 @@ func (r *fileResource) Create(ctx context.Context, req resource.CreateRequest, r
 	state.GroupName = types.StringValue(groupName)
 	state.Permissions = types.StringValue(permissions)
 	state.Content = types.StringValue(content)
+	state.EnsureDir = plan.EnsureDir
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, state)
@@ -285,7 +286,7 @@ func (r *fileResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if !plan.Owner.IsUnknown() && plan.Owner != state.Owner {
 		err = r.client.ChownFile(path, plan.Owner.String(), true)
 	} else if !plan.OwnerName.IsUnknown() && !plan.OwnerName.Equal(state.OwnerName) {
-		err = r.client.ChownFile(path, plan.OwnerName.String(), true)
+		err = r.client.ChownFile(path, plan.OwnerName.ValueString(), true)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -298,7 +299,7 @@ func (r *fileResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if !plan.Group.IsUnknown() && plan.Group != state.Group {
 		err = r.client.ChgrpFile(path, plan.Group.String(), true)
 	} else if !plan.GroupName.IsUnknown() && !plan.GroupName.Equal(state.GroupName) {
-		err = r.client.ChgrpFile(path, plan.GroupName.String(), true)
+		err = r.client.ChgrpFile(path, plan.GroupName.ValueString(), true)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

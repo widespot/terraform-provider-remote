@@ -21,7 +21,8 @@ resource "remote_folder" "edu" {
 
 resource "remote_file" "edu" {
   count      = 1
-  path       = "${remote_folder.edu[0].path}/test.txt"
+  ensure_dir = true
+  path       = "${remote_folder.edu[0].path}/blabetiblou/lol/test.txt"
   content    = "blabetiblou"
   owner_name = "root"
   group_name = "root"
