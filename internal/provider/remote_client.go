@@ -2,7 +2,6 @@ package provider
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -205,17 +204,19 @@ func (c *RemoteClient) ReadFileShell(path string, sudo bool) (string, bool, erro
 	}
 	defer session.Close()
 
+	var stderr bytes.Buffer
+    session.Stderr = &stderr
+
 	cmd := fmt.Sprintf("cat %s", path)
 	if c.sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
-	content, err := session.CombinedOutput(cmd)
+	content, err := session.Output(cmd)
 	if err != nil {
-		// TODO find a more reliable way to catch file not found
-		if bytes.Contains(content, []byte("No such file or directory")) {
+		if bytes.Contains(stderr.Bytes(), []byte("No such file or directory")) {
 			return "", false, nil
 		}
-		return "", false, errors.New(string(content))
+		return "", false, err
 	}
 
 	return string(content), true, nil
