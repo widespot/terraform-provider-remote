@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 #        rsyslog \
     && mkdir -p /var/run/sshd \
     && ssh-keygen -A \
-    && sed -i 's/^#\?MaxSessions.*/MaxSessions 50/' /etc/ssh/sshd_config \
+    && sed -i 's/^#\?MaxSessions.*/MaxSessions 10/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?LogLevel.*/LogLevel DEBUG3/' /etc/ssh/sshd_config \
     && sed -i 's/#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config \
     && useradd -m -s /bin/bash raphaeljoie \

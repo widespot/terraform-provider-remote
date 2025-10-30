@@ -3,6 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/user"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -10,8 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"golang.org/x/crypto/ssh"
-	"os"
-	"os/user"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -52,6 +53,7 @@ type hashicupsProviderModel struct {
 	PrivateKeyPath   types.String `tfsdk:"private_key_path"`
 	PrivateKeyEnvVar types.String `tfsdk:"private_key_env_var"`
 	Sudo             types.Bool   `tfsdk:"sudo"`
+	MaxSessions      types.Int64  `tfsdk:"max_sessions"`
 }
 
 // Schema defines the provider-level schema for configuration data.
@@ -91,6 +93,10 @@ func (p *hashicupsProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 			},
 			"sudo": schema.BoolAttribute{
 				Description: "Whether commands should be executed as sudo or not. Default: false",
+				Optional:    true,
+			},
+			"max_sessions": schema.Int64Attribute{
+				Description: "SSH max concurrent sessions. Default: 5",
 				Optional:    true,
 			},
 		},
@@ -170,7 +176,12 @@ func (p *hashicupsProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client, err := NewRemoteClient(config.Host.ValueString(), &clientConfig, config.Sudo.ValueBool())
+	maxSessions := int64(5) // Default value
+	if !config.MaxSessions.IsNull() {
+		maxSessions = config.MaxSessions.ValueInt64()
+	}
+
+	client, err := NewRemoteClient(config.Host.ValueString(), &clientConfig, config.Sudo.ValueBool(), int(maxSessions))
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Remote API Client",

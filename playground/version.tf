@@ -11,4 +11,5 @@ provider "remote" {
   username          = "root"
   host              = "localhost:8022"
   private_key_path  = "./id_rsa"
+  max_sessions      = 2
 }
