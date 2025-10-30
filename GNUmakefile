@@ -16,8 +16,8 @@ install:
 	mkdir -p $(INSTALL_DIR)/$(PROVIDER_PATH)
 	go build -ldflags="-s -w -X main.version=99.0.0" -o $(BIN_PATH)
 
-playground:
-	docker-compose -f playground/docker-compose.yml up -d
+playground-up:
+	docker compose -f playground/docker-compose.yml up --build -d
 
-clean:
-	docker-compose -f playground/docker-compose.yml down
+playground-down:
+	docker compose -f playground/docker-compose.yml down

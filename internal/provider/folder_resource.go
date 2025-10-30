@@ -170,11 +170,31 @@ func (r *folderResource) Create(ctx context.Context, req resource.CreateRequest,
 	state.Path = plan.Path
 	state.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
-	group, _ := r.client.ReadFileGroup(path, true)
-	owner, _ := r.client.ReadFileOwner(path, true)
-	groupName, _ := r.client.ReadFileGroupName(path, true)
-	ownerName, _ := r.client.ReadFileOwnerName(path, true)
-	permissions, _ := r.client.ReadFilePermissions(path, true)
+	group, err := r.client.ReadFileGroup(path, true)
+	if err != nil {
+        resp.Diagnostics.AddError("Couldn't load dir group id after creation", err.Error())
+        return
+    }
+	owner, err := r.client.ReadFileOwner(path, true)
+	if err != nil {
+        resp.Diagnostics.AddError("Couldn't load dir owner id after creation", err.Error())
+        return
+    }
+	groupName, err := r.client.ReadFileGroupName(path, true)
+	if err != nil {
+        resp.Diagnostics.AddError("Couldn't load dir group name after creation", err.Error())
+        return
+    }
+	ownerName, err := r.client.ReadFileOwnerName(path, true)
+	if err != nil {
+        resp.Diagnostics.AddError("Couldn't load dir owner name after creation", err.Error())
+        return
+    }
+	permissions, err := r.client.ReadFilePermissions(path, true)
+	if err != nil {
+        resp.Diagnostics.AddError("Couldn't load dir permissions name after creation", err.Error())
+        return
+    }
 
 	state.Owner = types.Int64Value(parseInt(owner))
 	state.Group = types.Int64Value(parseInt(group))

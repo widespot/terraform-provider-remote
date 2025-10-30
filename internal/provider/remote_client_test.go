@@ -16,7 +16,7 @@ func _client(user string) *RemoteClient {
 	}
 	clientConfig.Auth = append(clientConfig.Auth, ssh.Password("password"))
 
-	client, _ := NewRemoteClient("localhost:8022", &clientConfig, false)
+	client, _ := NewRemoteClient("localhost:8022", &clientConfig, false, 1)
 
 	return client
 }
@@ -28,7 +28,7 @@ func TestSshRootPasswordAuth(t *testing.T) {
 	}
 	clientConfig.Auth = append(clientConfig.Auth, ssh.Password("password"))
 
-	_, err := NewRemoteClient("localhost:8022", &clientConfig, false)
+	_, err := NewRemoteClient("localhost:8022", &clientConfig, false, 1)
 	if err != nil {
 		t.Errorf("Couldn't connect to root@localhost:8022. Error: %s", err)
 	}

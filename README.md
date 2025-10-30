@@ -38,10 +38,12 @@ make playground -B
 # remove previous known hosts records
 ssh-keygen -R "[localhost]:8022"
 # Try connectivity to remote, using password
-ssh root@localhost -p 8022
+ssh root@localhost -p 8022 -o PreferredAuthentications=password
 > root@127.0.0.1\'s password: password
+> exit
 # Try connectivity to remote, using identity file
 ssh root@localhost -p 8022 -i playground/id_rsa
+> exit
 # Play with playground/main.tf
 terraform -chdir=playground apply
 ```
